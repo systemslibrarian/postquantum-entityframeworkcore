@@ -38,7 +38,7 @@ jobs:
         run: dotnet test -c Release --no-build --collect:"XPlat Code Coverage" --results-directory ./coverage
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: ./coverage/**/coverage.cobertura.xml
@@ -66,7 +66,7 @@ jobs:
         run: ./scripts/generate-sbom.sh
 
       - name: Upload package + SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nuget-and-sbom
           path: |
