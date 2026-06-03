@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/samples/">
+    <Project Path="samples/ClinicRecords/ClinicRecords.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/PostQuantum.EntityFrameworkCore/PostQuantum.EntityFrameworkCore.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PostQuantum.EntityFrameworkCore.Tests/PostQuantum.EntityFrameworkCore.Tests.csproj" />
+  </Folder>
+</Solution>

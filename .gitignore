@@ -1,0 +1,38 @@
+# .NET build artifacts
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+
+# Test / coverage output
+[Tt]est[Rr]esults/
+coverage/
+*.coverage
+*.trx
+*.cobertura.xml
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+
+# SBOM output (generated, never committed as a binary artifact)
+sbom/
+*.cdx.json
+
+# IDE
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Local secrets / sample databases (NEVER commit real keys or data)
+*.db
+*.db-shm
+*.db-wal
+*.local.json
+appsettings.*.local.json
+secrets.json

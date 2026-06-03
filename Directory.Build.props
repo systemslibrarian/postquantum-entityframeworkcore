@@ -1,0 +1,48 @@
+<Project>
+
+  <!--
+    Shared MSBuild properties for every project in the PostQuantum.EntityFrameworkCore
+    repository. Library-specific packaging metadata lives in the library .csproj;
+    everything common to the whole repo (language version, analyzers, SourceLink,
+    deterministic builds, shared NuGet author/owner info) lives here.
+  -->
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+  </PropertyGroup>
+
+  <!-- Shared NuGet authorship / repository metadata. -->
+  <PropertyGroup>
+    <Product>PostQuantum.EntityFrameworkCore</Product>
+    <Authors>Paul Clark (Systems Librarian)</Authors>
+    <Company>Systems Librarian</Company>
+    <Copyright>Copyright (c) Paul Clark</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/systemslibrarian/postquantum-entityframeworkcore</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/systemslibrarian/postquantum-entityframeworkcore</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+  </PropertyGroup>
+
+  <!-- Deterministic / reproducible builds and SourceLink (CI only, to avoid local noise). -->
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+</Project>

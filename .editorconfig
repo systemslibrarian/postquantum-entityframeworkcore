@@ -1,0 +1,44 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.{csproj,props,targets}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.cs]
+# Namespaces
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# 'this.' qualification not required
+dotnet_style_qualification_for_field = false:silent
+dotnet_style_qualification_for_property = false:silent
+
+# var preferences
+csharp_style_var_for_built_in_types = false:silent
+csharp_style_var_when_type_is_apparent = true:silent
+
+# Expression-bodied members
+csharp_style_expression_bodied_methods = when_on_single_line:silent
+
+# Modifier order
+csharp_preferred_modifier_order = public,private,protected,internal,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:warning
+dotnet_style_readonly_field = true:warning
+
+# Security / reliability analyzers kept at warning (errors via TreatWarningsAsErrors)
+dotnet_diagnostic.CA5350.severity = error  # Do not use weak cryptographic algorithms
+dotnet_diagnostic.CA5351.severity = error  # Do not use broken cryptographic algorithms
+dotnet_diagnostic.CA2007.severity = none   # ConfigureAwait not required in this library style
