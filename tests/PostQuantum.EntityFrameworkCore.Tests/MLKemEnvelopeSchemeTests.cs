@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using PostQuantum.EntityFrameworkCore.Crypto;
 using PostQuantum.EntityFrameworkCore.Keys;
 using Xunit;
@@ -43,6 +44,28 @@ public class MLKemEnvelopeSchemeTests
         byte[] envelope = protector.ProtectText("sensitive");
 
         envelope[^1] ^= 0xFF;
+
+        Assert.Throws<PostQuantumCryptographicException>(() => protector.UnprotectText(envelope));
+    }
+
+    [Fact]
+    public void Envelope_unprotect_wraps_kem_failure_when_ciphertext_length_is_tampered()
+    {
+        // A real KEM (ML-KEM) rejects a wrong-sized ciphertext with a raw ArgumentException.
+        // The 2-byte length marker sits in the body, outside the AEAD associated data, so a
+        // tamperer can resize the KEM ciphertext. The handler must fail closed with its own
+        // exception rather than let the raw one escape and crash the query thread.
+        var kem = new LengthStrictKeyEncapsulationMechanism();
+        IPostQuantumProtector protector = TestKeys.EnvelopeProtector(kem);
+        byte[] envelope = protector.ProtectText("sensitive");
+
+        // The body begins right after the authenticated header; its first two bytes are the
+        // big-endian KEM-ciphertext length. Shrink it by one so the KEM sees a short ciphertext.
+        int lengthOffset = EncryptedEnvelope.Parse(envelope).AssociatedData.Length;
+        int declared = (envelope[lengthOffset] << 8) | envelope[lengthOffset + 1];
+        int tampered = declared - 1;
+        envelope[lengthOffset] = (byte)(tampered >> 8);
+        envelope[lengthOffset + 1] = (byte)tampered;
 
         Assert.Throws<PostQuantumCryptographicException>(() => protector.UnprotectText(envelope));
     }
@@ -96,5 +119,52 @@ public class MLKemEnvelopeSchemeTests
         Assert.Equal(EncryptionScheme.MLKem768Aes256Gcm, EncryptedEnvelope.Parse(modern).Scheme);
         Assert.Equal("old-value", protector.UnprotectText(legacy));
         Assert.Equal("new-value", protector.UnprotectText(modern));
+    }
+}
+
+/// <summary>
+/// A deterministic test KEM that, like real ML-KEM, rejects a wrong-sized ciphertext with a
+/// raw <see cref="ArgumentException"/>. Used to prove the envelope handler converts that into
+/// a <see cref="PostQuantumCryptographicException"/> instead of letting it escape.
+/// </summary>
+internal sealed class LengthStrictKeyEncapsulationMechanism : IKeyEncapsulationMechanism
+{
+    private const int SeedSize = 32;
+    private const int CiphertextSize = 48;
+
+    public string AlgorithmName => "FAKE-STRICT-KEM-FOR-TESTS";
+
+    public bool IsSupported => true;
+
+    public KeyEncapsulationKeyPair GenerateKeyPair(string keyId)
+    {
+        Span<byte> seed = stackalloc byte[SeedSize];
+        RandomNumberGenerator.Fill(seed);
+        return new KeyEncapsulationKeyPair(keyId, AlgorithmName, seed, seed);
+    }
+
+    public EncapsulationResult Encapsulate(KeyEncapsulationKeyPair publicKey)
+    {
+        var ciphertext = new byte[CiphertextSize];
+        RandomNumberGenerator.Fill(ciphertext);
+        return new EncapsulationResult(ciphertext, DeriveSecret(publicKey.EncapsulationKey, ciphertext));
+    }
+
+    public byte[] Decapsulate(KeyEncapsulationKeyPair privateKey, ReadOnlySpan<byte> ciphertext)
+    {
+        if (ciphertext.Length != CiphertextSize)
+        {
+            throw new ArgumentException("Ciphertext is not the correct size.", nameof(ciphertext));
+        }
+
+        return DeriveSecret(privateKey.DecapsulationKey, ciphertext);
+    }
+
+    private static byte[] DeriveSecret(ReadOnlySpan<byte> seed, ReadOnlySpan<byte> ciphertext)
+    {
+        Span<byte> buffer = stackalloc byte[SeedSize + CiphertextSize];
+        seed.CopyTo(buffer);
+        ciphertext.CopyTo(buffer[SeedSize..]);
+        return SHA256.HashData(buffer);
     }
 }

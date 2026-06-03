@@ -101,7 +101,23 @@ internal sealed class MLKemEnvelopeSchemeHandler : IEncryptionSchemeHandler
                 $"Key-encapsulation key '{keyId}' has no private material and cannot decrypt.");
         }
 
-        byte[] sharedSecret = _kem.Decapsulate(pair, kemCiphertext.Span);
+        byte[] sharedSecret;
+        try
+        {
+            sharedSecret = _kem.Decapsulate(pair, kemCiphertext.Span);
+        }
+        catch (Exception ex) when (ex is ArgumentException or CryptographicException)
+        {
+            // The KEM-ciphertext length marker lives in the body, outside the AEAD associated
+            // data, so a tamperer can present the KEM with a wrong-sized ciphertext. Real
+            // ML-KEM rejects that with a raw ArgumentException/CryptographicException; convert
+            // it to the library's single generic failure so the envelope fails closed instead
+            // of crashing the caller (the documented "quiet errors" contract).
+            throw new PostQuantumCryptographicException(
+                "Decryption failed: the envelope could not be authenticated. This indicates " +
+                "tampering, corruption, or use of the wrong key.", ex);
+        }
+
         Span<byte> dek = stackalloc byte[AuthenticatedCipher.KeySizeInBytes];
         try
         {

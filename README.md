@@ -224,6 +224,11 @@ and old AES rows keep decrypting while new rows use the post-quantum envelope.
 - **Traffic analysis / size leakage.** Ciphertext length is a known function of plaintext
   length (plus a fixed overhead). Pad upstream if length is sensitive.
 - **Correlation by other columns.** You can still link rows via unencrypted columns.
+- **Ciphertext relocation by an attacker with write access.** The associated data binds the
+  version, scheme, and key id — not the table, column, or row — so a whole valid envelope
+  copied into another location that shares the same key id still decrypts. Tampered *bytes*
+  are always rejected; *relocated* intact envelopes are not. See the
+  [threat model](docs/threat-model.md) and [KNOWN-GAPS.md](KNOWN-GAPS.md).
 
 See [SECURITY.md](SECURITY.md) for reporting and [KNOWN-GAPS.md](KNOWN-GAPS.md) for a frank,
 itemized list of current limitations.

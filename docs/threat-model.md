@@ -28,13 +28,19 @@ before relying on the library for anything that matters.
 | **Plaintext sprawl** | Logs, traces, caches, search indexes, debuggers, and crash dumps may capture decrypted values. Keep secrets out of these paths. |
 | **Side channels / length & timing** | Ciphertext length reveals plaintext length (± fixed overhead). The library uses constant-comparison primitives from the BCL but does not defend against all microarchitectural side channels. |
 | **Correlation via other columns** | Unencrypted columns (timestamps, foreign keys, status) can still be used to link or infer. Encrypt or generalize them if that matters. |
+| **Ciphertext relocation/replay (write access)** | An attacker who can *write* to the database can copy a whole valid envelope from one row or column into another that uses the **same key id**, and it will decrypt. The associated data binds version/scheme/key id — **not** the table, column, or primary key — so a relocated-but-unmodified value still authenticates. This is distinct from the Tamperer above, who only *modifies* bytes. Defend with database write-access controls; if you need cryptographic row/column binding, see the note below. |
 
 ## Cryptographic design decisions
 
 - **AEAD everywhere.** AES-256-GCM provides confidentiality *and* integrity. There is no
   unauthenticated mode to misuse.
 - **Associated-data binding.** The envelope header is the GCM associated data, so metadata
-  (version/scheme/key id) is integrity-protected even though it is stored in the clear.
+  (version/scheme/key id) is integrity-protected even though it is stored in the clear. The
+  header does **not** include the table, column, or primary key, so the associated data does
+  not bind a value to its database location (see *Ciphertext relocation/replay* above). Binding
+  to a logical destination — e.g. mixing the entity and property name into the associated data —
+  is a planned enhancement that would require a format-version bump; track it in
+  [KNOWN-GAPS.md](../KNOWN-GAPS.md).
 - **Per-value randomness.** A fresh 96-bit nonce per value (and a fresh KEM encapsulation per
   value in the hybrid scheme) prevents equality correlation and nonce reuse within a key.
 - **HKDF domain separation.** The hybrid scheme derives the data key with HKDF-SHA256 using

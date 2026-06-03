@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Hybrid envelope: fail closed on a tampered KEM-ciphertext length.** The 2-byte KEM
+  ciphertext length lives in the envelope body, outside the AEAD associated data. A corrupted
+  length marker could hand real ML-KEM a wrong-sized ciphertext, which threw a raw
+  `ArgumentException`/`CryptographicException` out of `Decapsulate` instead of the library's
+  `PostQuantumCryptographicException` — an unhandled exception on the query path. The hybrid
+  handler now wraps that into `PostQuantumCryptographicException`, upholding the documented
+  "single generic exception" contract.
+
+### Documentation
+
+- Documented that the associated data binds version/scheme/key id but **not** the table,
+  column, or row, so an attacker with database write access can relocate a whole valid
+  envelope to another location sharing the same key id and it will decrypt. Recorded the
+  entity/property-binding and KEM-block-binding hardenings (gated on a format-version bump) in
+  the threat model and KNOWN-GAPS.
+
 ## [0.1.0] — 2026-06-03
 
 Initial release. Production-usable for encrypting sensitive EF Core columns at rest.
@@ -53,4 +73,5 @@ the v0.1 scenarios:
 - Additional KEM parameter sets (ML-KEM-512/1024) behind the existing mechanism seam.
 - A first-class PostQuantum.KeyManagement adapter package and a re-encryption sweep helper.
 
+[Unreleased]: https://github.com/systemslibrarian/postquantum-entityframeworkcore/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/systemslibrarian/postquantum-entityframeworkcore/releases/tag/v0.1.0

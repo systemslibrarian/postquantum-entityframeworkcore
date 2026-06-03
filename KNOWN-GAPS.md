@@ -22,6 +22,19 @@ production. None of these are secret; several are intentional design choices.
   enforce or count toward this limit for you.
 - **One KEM (ML-KEM-768).** ML-KEM-512/1024 and other KEMs are not wired up. The
   `IKeyEncapsulationMechanism` seam exists so they *can* be added without a format change.
+- **Associated data does not bind a value to its database location.** The AES-GCM associated
+  data is the envelope header (version/scheme/key id) only. It does **not** include the table,
+  column, or primary key, so an attacker with database *write* access can copy a whole valid
+  envelope from one row/column into another that shares the same key id and it will decrypt
+  (see the threat model's *Ciphertext relocation/replay* row). Binding the entity/property
+  into the associated data is a planned enhancement gated on a format-version bump.
+- **The hybrid envelope's KEM-ciphertext block is not folded into the DEM associated data.**
+  The 2-byte KEM-ciphertext length and the KEM ciphertext sit in the body but outside the
+  AEAD's associated data. Tampering with them cannot leak plaintext — it yields a wrong
+  derived key and the AES-GCM tag check fails closed (a malformed length is now reported as a
+  `PostQuantumCryptographicException` rather than a raw exception). Absorbing the encapsulation
+  block into the associated data, as a strict HPKE construction would, is a defense-in-depth
+  hardening deferred to the same format-version bump above.
 
 ## Platform support
 
