@@ -30,6 +30,8 @@ sbom/
 .idea/
 
 # Local secrets / sample databases (NEVER commit real keys or data)
+*.key
+Nuget.key
 *.db
 *.db-shm
 *.db-wal
