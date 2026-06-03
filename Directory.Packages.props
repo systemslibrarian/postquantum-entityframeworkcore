@@ -13,7 +13,7 @@
 
   <!-- Build-time only: SourceLink for source-debuggable, verifiable packages. -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.300" />
   </ItemGroup>
 
   <!-- Microsoft.Extensions.* abstractions used by the DI integration. -->
