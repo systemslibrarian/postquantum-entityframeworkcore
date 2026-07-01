@@ -20,6 +20,13 @@ namespace PostQuantum.EntityFrameworkCore.Crypto;
 /// HKDF binds the derivation to the key id (as salt) and a fixed context string (as info),
 /// providing domain separation across schemes and keys.
 /// </para>
+/// <para>
+/// <b>Format version 2 (current).</b> The AES-GCM associated data is the envelope header
+/// <i>plus</i> the KEM block (<c>kemCtLen || kemCiphertext</c>), so the entire encapsulation
+/// is authenticated — an HPKE-style construction with no unauthenticated bytes in the body.
+/// Version-1 hybrid envelopes written by 0.1.0 (which authenticated only the header) are
+/// still read: decryption rebuilds the version-1 associated data when it sees version 1.
+/// </para>
 /// </remarks>
 internal sealed class MLKemEnvelopeSchemeHandler : IEncryptionSchemeHandler
 {
@@ -37,10 +44,28 @@ internal sealed class MLKemEnvelopeSchemeHandler : IEncryptionSchemeHandler
 
     public EncryptionScheme Scheme => EncryptionScheme.MLKem768Aes256Gcm;
 
+    public void ValidateReady()
+    {
+        if (!_kem.IsSupported)
+        {
+            throw new PlatformNotSupportedException(
+                $"The {Scheme} scheme is configured as the default for new writes, but the " +
+                $"'{_kem.AlgorithmName}' mechanism is unavailable on this platform. ML-KEM requires " +
+                ".NET 10+ with OpenSSL 3.5+ (Linux/macOS) or a recent Windows CNG. Probe " +
+                "MLKemKeyEncapsulationMechanism.IsSupported at startup and fall back to UseAes256Gcm " +
+                "where it is false. See KNOWN-GAPS.md.");
+        }
+
+        KeyEncapsulationKeyPair active = _keyRing.ActiveKey
+            ?? throw new PostQuantumCryptographicException(
+                "The key-encapsulation key ring returned no active key for the ML-KEM hybrid scheme.");
+        _ = active.KeyId;
+    }
+
     public byte[] Encrypt(ReadOnlySpan<byte> plaintext)
     {
         KeyEncapsulationKeyPair publicKey = _keyRing.ActiveKey;
-        byte[] header = EncryptedEnvelope.WriteHeader(Scheme, publicKey.KeyId);
+        byte[] header = EncryptedEnvelope.WriteHeader(Scheme, publicKey.KeyId, EncryptedEnvelope.HybridFormatVersion);
 
         EncapsulationResult encapsulation = _kem.Encapsulate(publicKey);
         byte[] sharedSecret = encapsulation.SharedSecret;
@@ -51,20 +76,25 @@ internal sealed class MLKemEnvelopeSchemeHandler : IEncryptionSchemeHandler
             throw new PostQuantumCryptographicException("KEM ciphertext is unexpectedly large.");
         }
 
+        // The KEM block (length + ciphertext) sits at the front of the body and is also
+        // folded into the AEAD associated data (format version 2), so the full encapsulation
+        // is authenticated alongside the header.
+        var kemBlock = new byte[2 + kemCiphertext.Length];
+        BinaryPrimitives.WriteUInt16BigEndian(kemBlock.AsSpan(0, 2), (ushort)kemCiphertext.Length);
+        kemCiphertext.CopyTo(kemBlock.AsSpan(2));
+
+        byte[] associatedData = BuildAssociatedData(header, kemBlock);
+
         Span<byte> dek = stackalloc byte[AuthenticatedCipher.KeySizeInBytes];
         try
         {
             DeriveKey(sharedSecret, publicKey.KeyId, dek);
-            byte[] dem = AuthenticatedCipher.Encrypt(dek, plaintext, header);
+            byte[] dem = AuthenticatedCipher.Encrypt(dek, plaintext, associatedData);
 
-            var body = new byte[2 + kemCiphertext.Length + dem.Length];
-            BinaryPrimitives.WriteUInt16BigEndian(body.AsSpan(0, 2), (ushort)kemCiphertext.Length);
-            kemCiphertext.CopyTo(body.AsSpan(2));
-            dem.CopyTo(body.AsSpan(2 + kemCiphertext.Length));
-
-            var envelope = new byte[header.Length + body.Length];
+            var envelope = new byte[header.Length + kemBlock.Length + dem.Length];
             header.CopyTo(envelope.AsSpan());
-            body.CopyTo(envelope.AsSpan(header.Length));
+            kemBlock.CopyTo(envelope.AsSpan(header.Length));
+            dem.CopyTo(envelope.AsSpan(header.Length + kemBlock.Length));
             return envelope;
         }
         finally
@@ -88,6 +118,7 @@ internal sealed class MLKemEnvelopeSchemeHandler : IEncryptionSchemeHandler
             throw new PostQuantumCryptographicException("Envelope body is truncated within the KEM ciphertext.");
         }
 
+        ReadOnlyMemory<byte> kemBlock = body.Slice(0, 2 + kemCtLength);
         ReadOnlyMemory<byte> kemCiphertext = body.Slice(2, kemCtLength);
         ReadOnlyMemory<byte> dem = body.Slice(2 + kemCtLength);
 
@@ -118,17 +149,37 @@ internal sealed class MLKemEnvelopeSchemeHandler : IEncryptionSchemeHandler
                 "tampering, corruption, or use of the wrong key.", ex);
         }
 
+        // Format version 2 folds the KEM block into the associated data; version 1 (written
+        // by 0.1.0) authenticated only the header. Rebuild the matching AAD for the version.
+        byte version = associatedData.Span[EncryptedEnvelope.VersionOffset];
+        byte[]? aadBuffer = version >= EncryptedEnvelope.HybridFormatVersion
+            ? BuildAssociatedData(associatedData.Span, kemBlock.Span)
+            : null;
+        ReadOnlySpan<byte> aad = aadBuffer ?? associatedData.Span;
+
         Span<byte> dek = stackalloc byte[AuthenticatedCipher.KeySizeInBytes];
         try
         {
             DeriveKey(sharedSecret, keyId, dek);
-            return AuthenticatedCipher.Decrypt(dek, dem.Span, associatedData.Span);
+            return AuthenticatedCipher.Decrypt(dek, dem.Span, aad);
         }
         finally
         {
             CryptographicOperations.ZeroMemory(dek);
             CryptographicOperations.ZeroMemory(sharedSecret);
         }
+    }
+
+    /// <summary>
+    /// Concatenates the envelope header and the KEM block into the associated data used by
+    /// the version-2 hybrid construction, so the entire encapsulation is authenticated.
+    /// </summary>
+    private static byte[] BuildAssociatedData(ReadOnlySpan<byte> header, ReadOnlySpan<byte> kemBlock)
+    {
+        var associatedData = new byte[header.Length + kemBlock.Length];
+        header.CopyTo(associatedData);
+        kemBlock.CopyTo(associatedData.AsSpan(header.Length));
+        return associatedData;
     }
 
     private static void DeriveKey(ReadOnlySpan<byte> sharedSecret, string keyId, Span<byte> destination)

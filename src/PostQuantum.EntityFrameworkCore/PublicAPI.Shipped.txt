@@ -1,0 +1,96 @@
+#nullable enable
+const PostQuantum.EntityFrameworkCore.Crypto.MLKemKeyEncapsulationMechanism.Algorithm = "ML-KEM-768" -> string!
+const PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey.KeySizeInBytes = 32 -> int
+PostQuantum.EntityFrameworkCore.Crypto.EncapsulationResult
+PostQuantum.EntityFrameworkCore.Crypto.EncapsulationResult.Ciphertext.get -> byte[]!
+PostQuantum.EntityFrameworkCore.Crypto.EncapsulationResult.EncapsulationResult() -> void
+PostQuantum.EntityFrameworkCore.Crypto.EncapsulationResult.EncapsulationResult(byte[]! ciphertext, byte[]! sharedSecret) -> void
+PostQuantum.EntityFrameworkCore.Crypto.EncapsulationResult.SharedSecret.get -> byte[]!
+PostQuantum.EntityFrameworkCore.Crypto.EncryptionScheme
+PostQuantum.EntityFrameworkCore.Crypto.EncryptionScheme.Aes256Gcm = 1 -> PostQuantum.EntityFrameworkCore.Crypto.EncryptionScheme
+PostQuantum.EntityFrameworkCore.Crypto.EncryptionScheme.MLKem768Aes256Gcm = 2 -> PostQuantum.EntityFrameworkCore.Crypto.EncryptionScheme
+PostQuantum.EntityFrameworkCore.Crypto.IKeyEncapsulationMechanism
+PostQuantum.EntityFrameworkCore.Crypto.IKeyEncapsulationMechanism.AlgorithmName.get -> string!
+PostQuantum.EntityFrameworkCore.Crypto.IKeyEncapsulationMechanism.Decapsulate(PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair! privateKey, System.ReadOnlySpan<byte> ciphertext) -> byte[]!
+PostQuantum.EntityFrameworkCore.Crypto.IKeyEncapsulationMechanism.Encapsulate(PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair! publicKey) -> PostQuantum.EntityFrameworkCore.Crypto.EncapsulationResult
+PostQuantum.EntityFrameworkCore.Crypto.IKeyEncapsulationMechanism.GenerateKeyPair(string! keyId) -> PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair!
+PostQuantum.EntityFrameworkCore.Crypto.IKeyEncapsulationMechanism.IsSupported.get -> bool
+PostQuantum.EntityFrameworkCore.Crypto.MLKemKeyEncapsulationMechanism
+PostQuantum.EntityFrameworkCore.Crypto.MLKemKeyEncapsulationMechanism.AlgorithmName.get -> string!
+PostQuantum.EntityFrameworkCore.Crypto.MLKemKeyEncapsulationMechanism.Decapsulate(PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair! privateKey, System.ReadOnlySpan<byte> ciphertext) -> byte[]!
+PostQuantum.EntityFrameworkCore.Crypto.MLKemKeyEncapsulationMechanism.Encapsulate(PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair! publicKey) -> PostQuantum.EntityFrameworkCore.Crypto.EncapsulationResult
+PostQuantum.EntityFrameworkCore.Crypto.MLKemKeyEncapsulationMechanism.GenerateKeyPair(string! keyId) -> PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair!
+PostQuantum.EntityFrameworkCore.Crypto.MLKemKeyEncapsulationMechanism.IsSupported.get -> bool
+PostQuantum.EntityFrameworkCore.Crypto.MLKemKeyEncapsulationMechanism.MLKemKeyEncapsulationMechanism() -> void
+PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder
+PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder.Services.get -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder.UseAes256Gcm(PostQuantum.EntityFrameworkCore.Keys.IDataProtectionKeyRing! keyRing, bool asDefault = true) -> PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder!
+PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder.UseAes256Gcm(System.Func<System.IServiceProvider!, PostQuantum.EntityFrameworkCore.Keys.IDataProtectionKeyRing!>! keyRingFactory, bool asDefault = true) -> PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder!
+PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder.UseKeyEncapsulationMechanism(PostQuantum.EntityFrameworkCore.Crypto.IKeyEncapsulationMechanism! mechanism) -> PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder!
+PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder.UseMLKem768Envelope(PostQuantum.EntityFrameworkCore.Keys.IKeyEncapsulationKeyRing! keyRing, bool asDefault = true) -> PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder!
+PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder.UseMLKem768Envelope(System.Func<System.IServiceProvider!, PostQuantum.EntityFrameworkCore.Keys.IKeyEncapsulationKeyRing!>! keyRingFactory, bool asDefault = true) -> PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder!
+PostQuantum.EntityFrameworkCore.DependencyInjection.ServiceCollectionExtensions
+PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedBinaryConverter
+PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedBinaryConverter.EncryptedBinaryConverter(PostQuantum.EntityFrameworkCore.IPostQuantumProtector! protector, Microsoft.EntityFrameworkCore.Storage.ValueConversion.ConverterMappingHints? mappingHints = null) -> void
+PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedDataMaintenance
+PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedPropertyBuilderExtensions
+PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedStringConverter
+PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedStringConverter.EncryptedStringConverter(PostQuantum.EntityFrameworkCore.IPostQuantumProtector! protector, Microsoft.EntityFrameworkCore.Storage.ValueConversion.ConverterMappingHints? mappingHints = null) -> void
+PostQuantum.EntityFrameworkCore.IPostQuantumProtector
+PostQuantum.EntityFrameworkCore.IPostQuantumProtector.DefaultScheme.get -> PostQuantum.EntityFrameworkCore.Crypto.EncryptionScheme
+PostQuantum.EntityFrameworkCore.IPostQuantumProtector.Protect(System.ReadOnlySpan<byte> plaintext) -> byte[]!
+PostQuantum.EntityFrameworkCore.IPostQuantumProtector.ProtectText(string! plaintext) -> byte[]!
+PostQuantum.EntityFrameworkCore.IPostQuantumProtector.Unprotect(System.ReadOnlyMemory<byte> protectedData) -> byte[]!
+PostQuantum.EntityFrameworkCore.IPostQuantumProtector.UnprotectText(System.ReadOnlyMemory<byte> protectedData) -> string!
+PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey
+PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey.DataEncryptionKey(string! keyId, System.ReadOnlySpan<byte> material) -> void
+PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey.Dispose() -> void
+PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey.KeyId.get -> string!
+PostQuantum.EntityFrameworkCore.Keys.IDataProtectionKeyRing
+PostQuantum.EntityFrameworkCore.Keys.IDataProtectionKeyRing.ActiveKey.get -> PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey!
+PostQuantum.EntityFrameworkCore.Keys.IDataProtectionKeyRing.Find(string! keyId) -> PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey?
+PostQuantum.EntityFrameworkCore.Keys.IKeyEncapsulationKeyRing
+PostQuantum.EntityFrameworkCore.Keys.IKeyEncapsulationKeyRing.ActiveKey.get -> PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair!
+PostQuantum.EntityFrameworkCore.Keys.IKeyEncapsulationKeyRing.Find(string! keyId) -> PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair?
+PostQuantum.EntityFrameworkCore.Keys.InMemoryDataProtectionKeyRing
+PostQuantum.EntityFrameworkCore.Keys.InMemoryDataProtectionKeyRing.ActiveKey.get -> PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey!
+PostQuantum.EntityFrameworkCore.Keys.InMemoryDataProtectionKeyRing.AddKey(PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey! key) -> void
+PostQuantum.EntityFrameworkCore.Keys.InMemoryDataProtectionKeyRing.Dispose() -> void
+PostQuantum.EntityFrameworkCore.Keys.InMemoryDataProtectionKeyRing.Find(string! keyId) -> PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey?
+PostQuantum.EntityFrameworkCore.Keys.InMemoryDataProtectionKeyRing.InMemoryDataProtectionKeyRing(PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey! key) -> void
+PostQuantum.EntityFrameworkCore.Keys.InMemoryDataProtectionKeyRing.InMemoryDataProtectionKeyRing(string! activeKeyId, System.Collections.Generic.IEnumerable<PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey!>! keys) -> void
+PostQuantum.EntityFrameworkCore.Keys.InMemoryDataProtectionKeyRing.RemoveKey(string! keyId) -> bool
+PostQuantum.EntityFrameworkCore.Keys.InMemoryDataProtectionKeyRing.SetActiveKey(string! keyId) -> void
+PostQuantum.EntityFrameworkCore.Keys.InMemoryKeyEncapsulationKeyRing
+PostQuantum.EntityFrameworkCore.Keys.InMemoryKeyEncapsulationKeyRing.ActiveKey.get -> PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair!
+PostQuantum.EntityFrameworkCore.Keys.InMemoryKeyEncapsulationKeyRing.AddKey(PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair! key) -> void
+PostQuantum.EntityFrameworkCore.Keys.InMemoryKeyEncapsulationKeyRing.Dispose() -> void
+PostQuantum.EntityFrameworkCore.Keys.InMemoryKeyEncapsulationKeyRing.Find(string! keyId) -> PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair?
+PostQuantum.EntityFrameworkCore.Keys.InMemoryKeyEncapsulationKeyRing.InMemoryKeyEncapsulationKeyRing(PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair! key) -> void
+PostQuantum.EntityFrameworkCore.Keys.InMemoryKeyEncapsulationKeyRing.InMemoryKeyEncapsulationKeyRing(string! activeKeyId, System.Collections.Generic.IEnumerable<PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair!>! keys) -> void
+PostQuantum.EntityFrameworkCore.Keys.InMemoryKeyEncapsulationKeyRing.RemoveKey(string! keyId) -> bool
+PostQuantum.EntityFrameworkCore.Keys.InMemoryKeyEncapsulationKeyRing.SetActiveKey(string! keyId) -> void
+PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair
+PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair.AlgorithmName.get -> string!
+PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair.CanDecapsulate.get -> bool
+PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair.Dispose() -> void
+PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair.KeyEncapsulationKeyPair(string! keyId, string! algorithmName, System.ReadOnlySpan<byte> encapsulationKey, System.ReadOnlySpan<byte> decapsulationKey = default(System.ReadOnlySpan<byte>)) -> void
+PostQuantum.EntityFrameworkCore.Keys.KeyEncapsulationKeyPair.KeyId.get -> string!
+PostQuantum.EntityFrameworkCore.PostQuantumCryptographicException
+PostQuantum.EntityFrameworkCore.PostQuantumCryptographicException.PostQuantumCryptographicException(string! message) -> void
+PostQuantum.EntityFrameworkCore.PostQuantumCryptographicException.PostQuantumCryptographicException(string! message, System.Exception! innerException) -> void
+PostQuantum.EntityFrameworkCore.PostQuantumProtector
+PostQuantum.EntityFrameworkCore.PostQuantumProtector.DefaultScheme.get -> PostQuantum.EntityFrameworkCore.Crypto.EncryptionScheme
+PostQuantum.EntityFrameworkCore.PostQuantumProtector.Protect(System.ReadOnlySpan<byte> plaintext) -> byte[]!
+PostQuantum.EntityFrameworkCore.PostQuantumProtector.ProtectText(string! plaintext) -> byte[]!
+PostQuantum.EntityFrameworkCore.PostQuantumProtector.Unprotect(System.ReadOnlyMemory<byte> protectedData) -> byte[]!
+PostQuantum.EntityFrameworkCore.PostQuantumProtector.UnprotectText(System.ReadOnlyMemory<byte> protectedData) -> string!
+PostQuantum.EntityFrameworkCore.PostQuantumProtectorExtensions
+static PostQuantum.EntityFrameworkCore.DependencyInjection.ServiceCollectionExtensions.AddPostQuantumEncryption(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<PostQuantum.EntityFrameworkCore.DependencyInjection.PostQuantumEncryptionBuilder!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedDataMaintenance.MarkEncryptedPropertiesModified<TEntity>(this Microsoft.EntityFrameworkCore.DbContext! context, TEntity! entity) -> int
+static PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedDataMaintenance.ReEncryptAsync<TEntity>(this Microsoft.EntityFrameworkCore.DbContext! context, int batchSize = 500, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<int>!
+static PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedPropertyBuilderExtensions.IsEncrypted(this Microsoft.EntityFrameworkCore.Metadata.Builders.PropertyBuilder! propertyBuilder, PostQuantum.EntityFrameworkCore.IPostQuantumProtector! protector) -> Microsoft.EntityFrameworkCore.Metadata.Builders.PropertyBuilder!
+static PostQuantum.EntityFrameworkCore.EntityFrameworkCore.EncryptedPropertyBuilderExtensions.IsEncrypted(this Microsoft.EntityFrameworkCore.Metadata.Builders.PropertyBuilder<byte[]!>! propertyBuilder, PostQuantum.EntityFrameworkCore.IPostQuantumProtector! protector) -> Microsoft.EntityFrameworkCore.Metadata.Builders.PropertyBuilder<byte[]!>!
+static PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey.Generate(string! keyId) -> PostQuantum.EntityFrameworkCore.Keys.DataEncryptionKey!
+static PostQuantum.EntityFrameworkCore.PostQuantumProtectorExtensions.ProtectBytes(this PostQuantum.EntityFrameworkCore.IPostQuantumProtector! protector, byte[]! plaintext) -> byte[]!
+static PostQuantum.EntityFrameworkCore.PostQuantumProtectorExtensions.UnprotectBytes(this PostQuantum.EntityFrameworkCore.IPostQuantumProtector! protector, byte[]! protectedData) -> byte[]!

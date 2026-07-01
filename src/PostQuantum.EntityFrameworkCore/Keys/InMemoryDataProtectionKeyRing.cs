@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace PostQuantum.EntityFrameworkCore.Keys;
 
 /// <summary>
@@ -12,11 +14,19 @@ namespace PostQuantum.EntityFrameworkCore.Keys;
 /// <see cref="IDataProtectionKeyRing"/> over a managed key store such as
 /// <c>PostQuantum.KeyManagement</c>, an HSM, or a cloud KMS.
 /// </para>
+/// <para>
+/// <b>Rotation.</b> Rotate <i>in place</i> with <see cref="AddKey"/> and
+/// <see cref="SetActiveKey"/> on the ring instance the protector already holds — do not
+/// build a new protector or ring to rotate. Entity Framework Core caches the model, and the
+/// value converters in that cached model capture the protector instance; swapping the
+/// protector has no effect until the model cache is invalidated. Mutating this ring is
+/// thread-safe and is observed immediately by the singleton protector.
+/// </para>
 /// </remarks>
 public sealed class InMemoryDataProtectionKeyRing : IDataProtectionKeyRing, IDisposable
 {
-    private readonly Dictionary<string, DataEncryptionKey> _keys;
-    private readonly string _activeKeyId;
+    private readonly ConcurrentDictionary<string, DataEncryptionKey> _keys;
+    private volatile string _activeKeyId;
     private bool _disposed;
 
     /// <summary>
@@ -29,7 +39,7 @@ public sealed class InMemoryDataProtectionKeyRing : IDataProtectionKeyRing, IDis
         ArgumentException.ThrowIfNullOrWhiteSpace(activeKeyId);
         ArgumentNullException.ThrowIfNull(keys);
 
-        _keys = new Dictionary<string, DataEncryptionKey>(StringComparer.Ordinal);
+        _keys = new ConcurrentDictionary<string, DataEncryptionKey>(StringComparer.Ordinal);
         foreach (DataEncryptionKey key in keys)
         {
             if (!_keys.TryAdd(key.KeyId, key))
@@ -69,6 +79,65 @@ public sealed class InMemoryDataProtectionKeyRing : IDataProtectionKeyRing, IDis
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(keyId);
         return _keys.GetValueOrDefault(keyId);
+    }
+
+    /// <summary>
+    /// Adds a key to the ring (for example a freshly generated key during rotation) without
+    /// changing which key is active. Historical values keep decrypting; new writes are
+    /// unaffected until <see cref="SetActiveKey"/> is called. Thread-safe.
+    /// </summary>
+    /// <exception cref="ArgumentException">A key with the same id is already present.</exception>
+    public void AddKey(DataEncryptionKey key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(key);
+        if (!_keys.TryAdd(key.KeyId, key))
+        {
+            throw new ArgumentException($"A key with id '{key.KeyId}' is already in the ring.", nameof(key));
+        }
+    }
+
+    /// <summary>
+    /// Makes an already-present key the active key for new writes. Combine with
+    /// <see cref="AddKey"/> to rotate: add the new key, then activate it. Thread-safe; the
+    /// change is observed immediately by the protector that holds this ring.
+    /// </summary>
+    /// <exception cref="ArgumentException">No key with this id is in the ring.</exception>
+    public void SetActiveKey(string keyId)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
+        if (!_keys.ContainsKey(keyId))
+        {
+            throw new ArgumentException($"No key with id '{keyId}' is in the ring; add it first.", nameof(keyId));
+        }
+
+        _activeKeyId = keyId;
+    }
+
+    /// <summary>
+    /// Removes (retires) a non-active key once nothing is encrypted under it — typically after
+    /// a re-encryption sweep. The active key cannot be removed. The removed key is disposed
+    /// (its material zeroed). Thread-safe.
+    /// </summary>
+    /// <returns><see langword="true"/> if a key was removed.</returns>
+    /// <exception cref="ArgumentException">An attempt was made to remove the active key.</exception>
+    public bool RemoveKey(string keyId)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
+        if (string.Equals(keyId, _activeKeyId, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Cannot remove the active key; activate another key first.", nameof(keyId));
+        }
+
+        if (_keys.TryRemove(keyId, out DataEncryptionKey? removed))
+        {
+            removed.Dispose();
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>Zeroes and disposes every key held by the ring.</summary>

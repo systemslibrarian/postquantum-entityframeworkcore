@@ -11,6 +11,16 @@ internal interface IEncryptionSchemeHandler
     EncryptionScheme Scheme { get; }
 
     /// <summary>
+    /// Verifies that this handler can encrypt new values right now: its platform support is
+    /// present and an active key is resolvable. Called for the default scheme when the
+    /// protector is constructed so that misconfiguration fails fast at startup rather than on
+    /// the first write.
+    /// </summary>
+    /// <exception cref="PlatformNotSupportedException">The scheme's platform support is absent.</exception>
+    /// <exception cref="PostQuantumCryptographicException">No active key is available.</exception>
+    void ValidateReady();
+
+    /// <summary>
     /// Produces a complete envelope (header + body) for <paramref name="plaintext"/> using
     /// this scheme's active key.
     /// </summary>

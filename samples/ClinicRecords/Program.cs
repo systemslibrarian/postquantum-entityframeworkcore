@@ -24,6 +24,14 @@ var dekRing = new InMemoryDataProtectionKeyRing(dataKey);
 var mlkem = new MLKemKeyEncapsulationMechanism();
 bool postQuantum = mlkem.IsSupported;
 
+// The KEK ring must outlive configuration: the value converters in EF Core's cached
+// model hold the protector, which holds this ring, for the whole program. (Declaring the
+// key pair inside the configure lambda below would dispose it as soon as the lambda
+// returns, leaving the ring holding a disposed key.) Disposed at program exit.
+using var kekRing = postQuantum
+    ? new InMemoryKeyEncapsulationKeyRing(mlkem.GenerateKeyPair("kek-sample-2026-01"))
+    : null;
+
 // ---------------------------------------------------------------------------
 // 2. Configure encryption. Prefer the post-quantum hybrid envelope when the
 //    platform supports ML-KEM; always keep AES-256-GCM available.
@@ -33,11 +41,9 @@ services.AddPostQuantumEncryption(pq =>
 {
     if (postQuantum)
     {
-        using var kek = mlkem.GenerateKeyPair("kek-sample-2026-01");
-        var kekRing = new InMemoryKeyEncapsulationKeyRing(kek);
         pq.UseKeyEncapsulationMechanism(mlkem);
         pq.UseAes256Gcm(dekRing, asDefault: false);          // kept for legacy/interop
-        pq.UseMLKem768Envelope(kekRing);                      // default for new writes
+        pq.UseMLKem768Envelope(kekRing!);                     // default for new writes
     }
     else
     {

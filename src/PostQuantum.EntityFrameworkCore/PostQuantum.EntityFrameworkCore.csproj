@@ -16,12 +16,12 @@
   <!-- ===== NuGet package metadata ===== -->
   <PropertyGroup>
     <PackageId>PostQuantum.EntityFrameworkCore</PackageId>
-    <Version>0.1.0</Version>
+    <Version>1.0.0</Version>
     <Title>PostQuantum.EntityFrameworkCore</Title>
     <Description>Secure-by-default, post-quantum encryption for sensitive data at rest in Entity Framework Core. Encrypt individual properties (emails, PII, financial and medical data) with authenticated AES-256-GCM, optionally wrapped in an ML-KEM-768 (FIPS 203) hybrid envelope for post-quantum key protection. Clean value-converter API, pluggable key rings for integration with PostQuantum.KeyManagement, honest threat model, and transparent supply chain.</Description>
     <PackageTags>post-quantum;postquantum;pqc;encryption;ml-kem;mlkem;kyber;fips203;entity-framework;entityframeworkcore;efcore;encryption-at-rest;column-encryption;field-encryption;pii;aes-gcm;security;cryptography</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>v0.1.0 — Initial release. AES-256-GCM field encryption with authenticated envelopes, ML-KEM-768 hybrid key-wrapping (feature-detected), EF Core value-converter integration, pluggable key rings, and full threat-model documentation. See CHANGELOG.md.</PackageReleaseNotes>
+    <PackageReleaseNotes>v1.0.0 — First stable release. Frozen, authenticated PQE1 envelope (now HPKE-style: the hybrid scheme authenticates the full ML-KEM encapsulation in format v2, reads v1); fail-fast startup validation of the default scheme; clear errors when IsEncrypted is misapplied; in-place key rotation on the in-memory rings plus ReEncryptAsync re-encryption sweep; tracked public API surface; expanded security tests. SemVer API and format stability for 1.x. See CHANGELOG.md.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -36,6 +36,13 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Public API surface is tracked so any change to it is a deliberate, reviewed edit. -->
+  <ItemGroup>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
 
   <ItemGroup>

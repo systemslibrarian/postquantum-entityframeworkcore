@@ -39,8 +39,16 @@ before relying on the library for anything that matters.
   header does **not** include the table, column, or primary key, so the associated data does
   not bind a value to its database location (see *Ciphertext relocation/replay* above). Binding
   to a logical destination — e.g. mixing the entity and property name into the associated data —
-  is a planned enhancement that would require a format-version bump; track it in
-  [KNOWN-GAPS.md](../KNOWN-GAPS.md).
+  remains a candidate enhancement that would require a future format-version bump; track it in
+  [KNOWN-GAPS.md](../KNOWN-GAPS.md). Note that this binding cannot be complete at the EF
+  value-converter layer: a converter never sees the row's primary key, so same-column,
+  row-to-row relocation cannot be defeated here even with entity/property binding.
+- **Whole-encapsulation authentication (hybrid, format v2).** In the ML-KEM hybrid scheme the
+  KEM encapsulation block (its length and ciphertext) is folded into the AES-GCM associated
+  data, so the entire encapsulation is authenticated — an HPKE-style construction with no
+  unauthenticated bytes in the body. Version-1 hybrid envelopes written by 0.1.0 (which
+  authenticated only the header, and already failed closed on a tampered encapsulation via a
+  wrong derived key) are still read.
 - **Per-value randomness.** A fresh 96-bit nonce per value (and a fresh KEM encapsulation per
   value in the hybrid scheme) prevents equality correlation and nonce reuse within a key.
 - **HKDF domain separation.** The hybrid scheme derives the data key with HKDF-SHA256 using
@@ -54,7 +62,9 @@ before relying on the library for anything that matters.
 
 ## Operational guidance
 
-- Keep keys in a managed store; rotate DEKs on a schedule.
+- Keep keys in a managed store; rotate DEKs on a schedule. Rotate the active key in place on
+  the ring the protector holds, then retire the old key once a re-encryption sweep completes
+  (see [migration.md](migration.md) and `DbContext.ReEncryptAsync<T>()`).
 - Prefer the ML-KEM hybrid scheme for new data on supported platforms.
 - Treat decrypted values as toxic: minimize where they live and how long.
 - Pad values whose *length* is sensitive before storing them.
