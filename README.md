@@ -78,6 +78,29 @@ clean seam for real key management.
   encryption (and consider using this *on top* for the few crown-jewel columns).
 - You need **format-preserving** encryption (e.g. keep a 16-digit number 16 digits).
 
+### This library vs. full-database solutions
+
+| | **This library** (field encryption) | **Always Encrypted** (SQL Server) | **TDE** / filesystem encryption |
+| --- | --- | --- | --- |
+| **Granularity** | Per chosen column | Per chosen column | Whole database / disk |
+| **Threat covered** | DB dump, backup, storage read access | DB admin + storage; keys stay client-side | DB files / disk at rest |
+| **Protects against a live, compromised DB connection** | Yes (server only ever sees ciphertext) | Yes | **No** (data is decrypted for any valid connection) |
+| **Queryable encrypted columns** | No (non-deterministic) | Limited (deterministic columns only) | Yes (transparent) |
+| **Post-quantum key wrapping** | **Yes** (ML-KEM-768 option) | No | No |
+| **Database engine support** | Any EF Core provider | SQL Server / Azure SQL | Engine-specific |
+| **Key custody** | Your KMS/HSM via key rings | Windows cert store / Azure Key Vault | Engine / OS |
+
+**Rule of thumb:** use **TDE/filesystem encryption** for blanket at-rest protection of the
+whole database, and add **this library on top** for the few crown-jewel columns you want
+protected even from someone who can read the live database — with a post-quantum migration
+path for the key-wrapping layer. Reach for **Always Encrypted** instead if you are all-in on
+SQL Server and need limited equality queries on protected columns.
+
+> **Not** ASP.NET Core Data Protection. Despite the familiar `Protect`/`Unprotect` shape and
+> the `IDataProtectionKeyRing` name, this library does not use or extend
+> `Microsoft.AspNetCore.DataProtection`. That stack is not post-quantum and has a different
+> key-lifetime and rotation model; this library is a separate, purpose-built at-rest cipher.
+
 ## Quick start
 
 Install (from this repository or, once published, from NuGet):
@@ -151,7 +174,10 @@ PQE1 | ver | scheme | keyIdLen | keyId | scheme-specific body
 
 Because the whole header is fed to AES-GCM as associated data, the format version, the
 scheme, and the key id are all cryptographically bound to the ciphertext. There is **no
-silent downgrade** and **no key-id confusion**.
+silent downgrade** and **no key-id confusion**. The hybrid scheme additionally folds its KEM
+encapsulation block into the associated data (envelope format version 2), so the entire
+encapsulation is authenticated — an HPKE-style construction. The `PQE1` magic is a fixed
+family marker; the version *byte* governs the layout, and readers accept versions 1 and 2.
 
 | Scheme | Id | What it does | Post-quantum? |
 | --- | --- | --- | --- |
@@ -191,14 +217,34 @@ its own dependencies, lifetime, and disposal.
 
 ## Key rotation
 
-Rotation is first-class because the key id travels inside every envelope:
+Rotation is first-class because the key id travels inside every envelope. Rotate **in place**
+on the ring the protector already holds:
 
-1. Add a new key to the ring and mark it active. New writes use it automatically.
-2. Keep old keys in the ring. Existing rows still decrypt by their recorded key id.
-3. Optionally re-encrypt old rows in the background (load → `SaveChanges`) to retire a key.
+```csharp
+dekRing.AddKey(DataEncryptionKey.Generate("dek-2026-07")); // add the new key
+dekRing.SetActiveKey("dek-2026-07");                        // new writes use it; old rows still decrypt
+int rewritten = await db.ReEncryptAsync<Customer, int>();  // re-encrypt existing rows under the new key
+dekRing.RemoveKey("dek-2026-01");                          // retire the old key once the sweep is done
+```
+
+1. Add a new key and activate it. New writes use it automatically; existing rows still decrypt
+   by their recorded key id.
+2. Re-encrypt old rows with `ReEncryptAsync<TEntity, TKey>()` on a dedicated context (or
+   `MarkEncryptedPropertiesModified` for a custom query) to retire a key. A plain
+   load-and-`SaveChanges` will **not** rewrite an unchanged value — change tracking compares
+   the decrypted value — so the helper marks the columns for you. The sweep snapshots primary
+   keys up front and batches by key membership, so it is safe to run online (no row is skipped
+   under concurrent inserts or deletes).
+3. Remove the old key from the ring.
+
+> **Rotate in place, not by swapping the protector.** EF Core caches the model, and the value
+> converters in that cached model capture the protector instance. Build a *new* protector/ring
+> and nothing changes until the cache is invalidated — so mutate the ring the protector holds
+> (the in-memory rings are thread-safe; a KMS-backed ring reflects its active key dynamically).
 
 The same applies to schemes: register both the AES and ML-KEM handlers during a migration
-and old AES rows keep decrypting while new rows use the post-quantum envelope.
+and old AES rows keep decrypting while new rows use the post-quantum envelope. See
+[docs/migration.md](docs/migration.md) for the full rotation and backfill guide.
 
 ## Threat model
 
@@ -237,8 +283,10 @@ itemized list of current limitations.
 
 - **Encrypted columns are not queryable** in the database (no `WHERE`, index, sort, or join
   on the protected value). This is intentional — encryption is non-deterministic.
-- **No automatic key rotation/scheduling.** The library makes rotation *safe*; it does not
-  *drive* it. That belongs in PostQuantum.KeyManagement.
+- **No automatic key rotation/scheduling.** The library makes rotation *safe* and provides
+  helpers to perform it (`AddKey`/`SetActiveKey`/`RemoveKey` on the ring and
+  `ReEncryptAsync<TEntity, TKey>()`), but it does not *schedule* it — you decide when. Scheduling belongs
+  in PostQuantum.KeyManagement.
 - **ML-KEM availability is platform-dependent** (see below). Where unavailable, you get a
   clear `PlatformNotSupportedException` rather than a silent downgrade. AES-256-GCM always
   works.
@@ -308,10 +356,17 @@ dotnet run --project samples/ClinicRecords
 
 ## Versioning & roadmap
 
-This is **v0.1.0** and is intended to be production-usable today for the scenarios above:
-the cryptography is standard and BCL-backed, the envelope is versioned and authenticated,
-and key rotation and scheme migration work. See [CHANGELOG.md](CHANGELOG.md) for the precise
-contents of this release and a short, honest note on what would come next.
+This is **v1.0.0**. It follows [Semantic Versioning](https://semver.org); for the 1.x line:
+
+- **API stability.** The public surface is tracked (a `PublicAPI.txt` baseline enforced by an
+  analyzer). No breaking changes to public types within 1.x.
+- **Format stability.** The `PQE1` envelope, the scheme ids (`Aes256Gcm = 1`,
+  `MLKem768Aes256Gcm = 2`), and envelope format versions 1 and 2 are frozen for 1.x. Any new
+  format is introduced under a new version byte that 1.x can still read; data written by 1.x
+  stays readable across 1.x. (Note: 0.1.0 cannot read the hybrid format-v2 envelopes 1.0
+  writes — upgrade all nodes before writing post-quantum values.)
+
+See [CHANGELOG.md](CHANGELOG.md) for the precise contents of this release.
 
 ## License
 

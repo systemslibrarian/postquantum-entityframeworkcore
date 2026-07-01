@@ -23,18 +23,20 @@ production. None of these are secret; several are intentional design choices.
 - **One KEM (ML-KEM-768).** ML-KEM-512/1024 and other KEMs are not wired up. The
   `IKeyEncapsulationMechanism` seam exists so they *can* be added without a format change.
 - **Associated data does not bind a value to its database location.** The AES-GCM associated
-  data is the envelope header (version/scheme/key id) only. It does **not** include the table,
-  column, or primary key, so an attacker with database *write* access can copy a whole valid
-  envelope from one row/column into another that shares the same key id and it will decrypt
-  (see the threat model's *Ciphertext relocation/replay* row). Binding the entity/property
-  into the associated data is a planned enhancement gated on a format-version bump.
-- **The hybrid envelope's KEM-ciphertext block is not folded into the DEM associated data.**
-  The 2-byte KEM-ciphertext length and the KEM ciphertext sit in the body but outside the
-  AEAD's associated data. Tampering with them cannot leak plaintext — it yields a wrong
-  derived key and the AES-GCM tag check fails closed (a malformed length is now reported as a
-  `PostQuantumCryptographicException` rather than a raw exception). Absorbing the encapsulation
-  block into the associated data, as a strict HPKE construction would, is a defense-in-depth
-  hardening deferred to the same format-version bump above.
+  data is the envelope header (version/scheme/key id) — plus, in the hybrid scheme, the KEM
+  encapsulation block. It does **not** include the table, column, or primary key, so an
+  attacker with database *write* access can copy a whole valid envelope from one row/column
+  into another that shares the same key id and it will decrypt (see the threat model's
+  *Ciphertext relocation/replay* row). Binding the entity/property into the associated data is
+  a candidate enhancement gated on a future format-version bump — but note it cannot be
+  complete at the EF value-converter layer, which never sees a row's primary key, so
+  same-column row-to-row relocation would remain undefended even then.
+- **The hybrid envelope now authenticates the full encapsulation (format v2).** As of 1.0 the
+  KEM-ciphertext length and ciphertext are folded into the AES-GCM associated data, so the
+  whole encapsulation is authenticated (an HPKE-style construction). Version-1 hybrid envelopes
+  written by 0.1.0 — which authenticated only the header, and already failed closed on a
+  tampered encapsulation because it produced a wrong derived key — are still read. The
+  AES-256-GCM scheme is unchanged and continues to emit version-1 envelopes.
 
 ## Platform support
 
@@ -54,8 +56,12 @@ production. None of these are secret; several are intentional design choices.
   key-management layer (PostQuantum.KeyManagement / HSM / KMS) implementing the ring
   interfaces.
 - **No automatic rotation or re-encryption job.** Rotation is *safe* (old values stay
-  readable by key id), but the library does not *schedule* rotation or sweep old rows. You
-  drive that from your application or key-management layer.
+  readable by key id) and *supported* — rotate the active key in place with the ring's
+  `AddKey`/`SetActiveKey`, and re-encrypt existing rows with `DbContext.ReEncryptAsync<TEntity, TKey>()`
+  (or `MarkEncryptedPropertiesModified` for custom sweeps) — but the library does not
+  *schedule* rotation. You decide when to rotate and when to run the sweep. Note that rebuilding
+  a fresh protector/ring to rotate does **not** work: EF Core caches the model (and the
+  captured protector) per context type, so you must mutate the ring the protector already holds.
 - **In-memory keys are process-lifetime.** `InMemoryDataProtectionKeyRing` and
   `InMemoryKeyEncapsulationKeyRing` hold material in managed memory (zeroed on dispose). They
   are for development, tests, and small self-hosted use — not a substitute for an HSM.

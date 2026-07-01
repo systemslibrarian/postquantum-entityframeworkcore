@@ -37,6 +37,19 @@ public static class EncryptedPropertyBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(propertyBuilder);
         ArgumentNullException.ThrowIfNull(protector);
+
+        Type clrType = propertyBuilder.Metadata.ClrType;
+        if (clrType != typeof(string))
+        {
+            string name = propertyBuilder.Metadata.Name;
+            throw new ArgumentException(
+                $"IsEncrypted cannot be applied to property '{name}' of type '{clrType}'. This overload " +
+                "encrypts string properties; for binary data use a byte[] property (the byte[] overload is " +
+                "selected automatically). Other CLR types are not supported — convert the value to a string " +
+                "or byte[] before encrypting.",
+                nameof(propertyBuilder));
+        }
+
         return propertyBuilder.HasConversion(new EncryptedStringConverter(protector));
     }
 

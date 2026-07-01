@@ -17,6 +17,15 @@ internal sealed class Aes256GcmSchemeHandler : IEncryptionSchemeHandler
 
     public EncryptionScheme Scheme => EncryptionScheme.Aes256Gcm;
 
+    public void ValidateReady()
+    {
+        // Resolving the active key proves the ring is wired up and has a usable DEK.
+        DataEncryptionKey active = _keyRing.ActiveKey
+            ?? throw new PostQuantumCryptographicException(
+                "The data-protection key ring returned no active key for the AES-256-GCM scheme.");
+        _ = active.KeyId;
+    }
+
     public byte[] Encrypt(ReadOnlySpan<byte> plaintext)
     {
         DataEncryptionKey key = _keyRing.ActiveKey;

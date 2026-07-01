@@ -58,14 +58,49 @@ services.AddPostQuantumEncryption(pq =>
 
 ## Rotating a data-encryption key
 
+Rotate **in place** on the ring your protector already holds. Do *not* build a new protector
+or ring to rotate: EF Core caches the model, and the value converters in that cached model
+capture the protector instance, so a swapped protector has no effect until the model cache is
+invalidated. The in-memory rings expose thread-safe rotation for exactly this reason (a
+production KMS-backed ring instead reflects the active key dynamically).
+
 ```csharp
-var ring = new InMemoryDataProtectionKeyRing(
-    activeKeyId: "dek-2026-07",
-    keys: [oldKey /* dek-2026-01 */, newKey /* dek-2026-07 */]);
+// dekRing is the same IDataProtectionKeyRing instance the protector was built with.
+dekRing.AddKey(DataEncryptionKey.Generate("dek-2026-07")); // new writes still use the old key…
+dekRing.SetActiveKey("dek-2026-07");                        // …until you activate the new one
 ```
 
-New writes use `dek-2026-07`; rows written under `dek-2026-01` still decrypt. Re-encrypt in
-the background to retire the old key, then drop it from the ring.
+New writes now use `dek-2026-07`; rows written under `dek-2026-01` still decrypt because the
+old key remains in the ring.
+
+### Re-encrypting existing rows to retire the old key
+
+A plain load-and-`SaveChanges` does **not** rewrite an unchanged value: EF Core change
+tracking compares the *decrypted* model value, which is unchanged by rotation, so no UPDATE is
+generated. Use the helpers, which mark the encrypted columns so EF re-runs the converter:
+
+```csharp
+// Sweep every row of an entity in batches, rewriting each encrypted column under the
+// now-active key. Run it on a DEDICATED context (no tracked entities): the sweep saves and
+// evicts as it goes. It snapshots primary keys up front and batches by key membership, so it
+// is safe to run online — concurrent inserts/deletes cannot cause a row to be skipped.
+// Pass the entity type and its primary-key type.
+int rewritten = await maintenanceDb.ReEncryptAsync<Customer, int>(batchSize: 500);
+
+// …or, for a custom query / composite keys, force re-encryption per entity:
+foreach (var c in db.Customers.Where(/* your filter */))
+    db.MarkEncryptedPropertiesModified(c);
+await db.SaveChangesAsync();
+```
+
+Once every row is re-encrypted, retire the old key:
+
+```csharp
+dekRing.RemoveKey("dek-2026-01"); // throws if it is still the active key
+```
+
+The same `AddKey`/`SetActiveKey`/`RemoveKey` surface exists on
+`InMemoryKeyEncapsulationKeyRing` for rotating ML-KEM key-encapsulation keys.
 
 ## Choosing a column type
 

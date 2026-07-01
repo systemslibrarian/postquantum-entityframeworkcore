@@ -67,11 +67,16 @@ public sealed class PostQuantumProtector : IPostQuantumProtector
             }
         }
 
-        if (!_handlers.ContainsKey(defaultScheme))
+        if (!_handlers.TryGetValue(defaultScheme, out IEncryptionSchemeHandler? defaultHandler))
         {
             throw new ArgumentException(
                 $"No handler is registered for the default scheme {defaultScheme}.", nameof(defaultScheme));
         }
+
+        // Fail fast: confirm the scheme used for new writes is actually usable on this
+        // platform and has an active key, so a misconfiguration surfaces at construction
+        // (typically application startup) rather than on the first SaveChanges.
+        defaultHandler.ValidateReady();
 
         DefaultScheme = defaultScheme;
     }

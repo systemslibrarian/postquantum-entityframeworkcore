@@ -14,6 +14,7 @@
   <!-- Build-time only: SourceLink for source-debuggable, verifiable packages. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.300" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="4.14.0" />
   </ItemGroup>
 
   <!-- Microsoft.Extensions.* abstractions used by the DI integration. -->
@@ -47,6 +48,19 @@
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+  </ItemGroup>
+
+  <!--
+    Transitive pin of the SQLitePCLRaw native SQLite bundle used by the EF Core SQLite
+    provider in tests and the sample. The 2.1.x series carries GHSA-2m69-gcr7-jv3q; the
+    3.x line ships a patched SQLite. These are test/sample-only and are NOT part of the
+    shipped library package. Pinned centrally so every project resolves the patched build.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+    <PackageVersion Include="SQLitePCLRaw.core" Version="3.0.3" />
+    <PackageVersion Include="SQLitePCLRaw.provider.e_sqlite3" Version="3.0.3" />
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.50.3" />
   </ItemGroup>
 
 </Project>

@@ -6,23 +6,68 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-06-30
+
+First stable release. Commits to Semantic Versioning for the 1.x line: the public API and the
+envelope format (PQE1, scheme ids, format versions 1–2) are stable. Data written by 1.x stays
+readable across 1.x.
+
+### Added
+
+- **In-place key rotation on the in-memory rings.** `InMemoryDataProtectionKeyRing` and
+  `InMemoryKeyEncapsulationKeyRing` now expose thread-safe `AddKey`, `SetActiveKey`, and
+  `RemoveKey`, so rotation works on the ring the protector already holds. (Rebuilding a fresh
+  protector to rotate does not work — EF Core caches the model, including the captured
+  protector — so this is the supported path; a KMS-backed ring reflects its active key
+  dynamically.)
+- **Re-encryption helpers** (`EncryptedDataMaintenance`): `DbContext.ReEncryptAsync<TEntity, TKey>()`
+  sweeps an entity's rows in batches and rewrites each encrypted column under the active
+  key/scheme; `DbContext.MarkEncryptedPropertiesModified(entity)` does the same for a custom
+  query. These force EF Core to re-run the value converter — a plain load-and-`SaveChanges`
+  does not, because change tracking compares the unchanged decrypted value. The sweep
+  snapshots primary keys up front and batches by key membership (not offset paging), so it is
+  safe to run online — concurrent inserts/deletes cannot skip a row — and it requires a
+  dedicated context (no tracked entities) so it never commits or evicts your application's graph.
+- **Fail-fast startup validation.** Constructing the protector now verifies that the default
+  scheme is usable on this platform and has an active key, so a misconfiguration (for example
+  ML-KEM as the default on a host without it) throws at construction/startup rather than on the
+  first write.
+- **Tracked public API surface.** A `PublicAPI.txt` baseline enforced by
+  `Microsoft.CodeAnalysis.PublicApiAnalyzers` makes any change to the public surface a
+  deliberate, reviewed edit.
+
+### Changed
+
+- **Hybrid envelope now authenticates the full encapsulation (format version 2).** The ML-KEM
+  scheme folds the KEM block (length + ciphertext) into the AES-GCM associated data — an
+  HPKE-style construction with no unauthenticated bytes in the body. Version-1 hybrid envelopes
+  written by 0.1.0 are still read. The AES-256-GCM scheme is unchanged and continues to emit
+  version-1 envelopes. **Compatibility:** 0.1.0 cannot read format-v2 hybrid envelopes, so
+  upgrade all nodes before writing post-quantum values.
+- **`IsEncrypted` rejects unsupported property types** with a clear, property-named error
+  instead of an opaque EF Core model-build failure (use `string` or `byte[]`).
+
 ### Fixed
 
-- **Hybrid envelope: fail closed on a tampered KEM-ciphertext length.** The 2-byte KEM
-  ciphertext length lives in the envelope body, outside the AEAD associated data. A corrupted
-  length marker could hand real ML-KEM a wrong-sized ciphertext, which threw a raw
+- **Hybrid envelope: fail closed on a tampered KEM-ciphertext length.** A corrupted length
+  marker could hand real ML-KEM a wrong-sized ciphertext, throwing a raw
   `ArgumentException`/`CryptographicException` out of `Decapsulate` instead of the library's
-  `PostQuantumCryptographicException` — an unhandled exception on the query path. The hybrid
-  handler now wraps that into `PostQuantumCryptographicException`, upholding the documented
-  "single generic exception" contract.
+  `PostQuantumCryptographicException`. The hybrid handler now wraps that, upholding the
+  "single generic exception" contract. (In format v2 the length is also authenticated.)
+
+### Security
+
+- **Supply chain:** pinned the SQLite native bundle used by tests and the sample to a patched
+  release (SQLitePCLRaw 3.x), clearing advisory GHSA-2m69-gcr7-jv3q. These are test/sample-only
+  dependencies and are not part of the shipped library package.
 
 ### Documentation
 
-- Documented that the associated data binds version/scheme/key id but **not** the table,
-  column, or row, so an attacker with database write access can relocate a whole valid
-  envelope to another location sharing the same key id and it will decrypt. Recorded the
-  entity/property-binding and KEM-block-binding hardenings (gated on a format-version bump) in
-  the threat model and KNOWN-GAPS.
+- Added a "this library vs. Always Encrypted / TDE" comparison table and an explicit note that
+  the library is **not** ASP.NET Core Data Protection.
+- Expanded the key-rotation / re-encryption guide and documented the EF model-cache rotation
+  gotcha. Recorded that location binding (entity/property/row) remains out of scope and cannot
+  be complete at the value-converter layer.
 
 ## [0.1.0] — 2026-06-03
 
@@ -66,12 +111,13 @@ Initial release. Production-usable for encrypting sensitive EF Core columns at r
 ## What would come next
 
 Kept intentionally short and honest — these strengthen the library but are not required for
-the v0.1 scenarios:
+the 1.0 scenarios:
 
 - Optional `[Encrypted]` attribute / convention to complement the fluent API.
 - A nonce-budget guard that warns before a data key approaches its safe message limit.
 - Additional KEM parameter sets (ML-KEM-512/1024) behind the existing mechanism seam.
-- A first-class PostQuantum.KeyManagement adapter package and a re-encryption sweep helper.
+- A first-class PostQuantum.KeyManagement adapter package.
 
-[Unreleased]: https://github.com/systemslibrarian/postquantum-entityframeworkcore/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/systemslibrarian/postquantum-entityframeworkcore/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/systemslibrarian/postquantum-entityframeworkcore/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/systemslibrarian/postquantum-entityframeworkcore/releases/tag/v0.1.0
