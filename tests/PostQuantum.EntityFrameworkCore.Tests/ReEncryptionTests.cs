@@ -97,12 +97,15 @@ public class ReEncryptionTests
         int count;
         using (var ctx = new SweepContext(options, protector))
         {
-            count = await ctx.ReEncryptAsync<Record>(batchSize: 10);
+            count = await ctx.ReEncryptAsync<Record, int>(batchSize: 10);
         }
 
         Assert.Equal(25, count);
-        Assert.Equal("dek-B", EmailKeyId(connection, 1));
-        Assert.Equal("dek-B", EmailKeyId(connection, 25));
+        // Every row — across all three batches — must now be under the new key (no row skipped).
+        for (int id = 1; id <= 25; id++)
+        {
+            Assert.Equal("dek-B", EmailKeyId(connection, id));
+        }
 
         // Key A is no longer referenced by any row: retiring it must not break reads.
         Assert.True(ring.RemoveKey("dek-A"));
@@ -167,12 +170,53 @@ public class ReEncryptionTests
             .UseSqlite(connection)
             .Options;
 
-        using var ctx = new PlainContext(options);
-        ctx.Database.EnsureCreated();
-        ctx.Plain.Add(new Plain { Name = "x" });
-        await ctx.SaveChangesAsync();
+        using (var seed = new PlainContext(options))
+        {
+            seed.Database.EnsureCreated();
+            seed.Plain.Add(new Plain { Name = "x" });
+            await seed.SaveChangesAsync();
+        }
 
-        Assert.Equal(0, await ctx.ReEncryptAsync<Plain>());
+        using var ctx = new PlainContext(options);
+        Assert.Equal(0, await ctx.ReEncryptAsync<Plain, int>());
+    }
+
+    [Fact]
+    public async Task ReEncryptAsync_rejects_a_context_that_already_tracks_entities()
+    {
+        using var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        (IPostQuantumProtector protector, _) = NewAes("dek-A");
+        DbContextOptions<SweepContext> options = new DbContextOptionsBuilder<SweepContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        using var ctx = new SweepContext(options, protector);
+        ctx.Database.EnsureCreated();
+        ctx.Records.Add(new Record { Email = "a@b.c", Scan = [1] });
+        await ctx.SaveChangesAsync(); // the added entity stays tracked
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => ctx.ReEncryptAsync<Record, int>());
+    }
+
+    [Fact]
+    public async Task ReEncryptAsync_reports_a_key_type_mismatch()
+    {
+        using var connection = new SqliteConnection("DataSource=:memory:");
+        connection.Open();
+        (IPostQuantumProtector protector, _) = NewAes("dek-A");
+        DbContextOptions<SweepContext> options = new DbContextOptionsBuilder<SweepContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        using (var seed = new SweepContext(options, protector))
+        {
+            seed.Database.EnsureCreated();
+        }
+
+        using var ctx = new SweepContext(options, protector);
+        // The primary key is int, not Guid.
+        await Assert.ThrowsAsync<ArgumentException>(() => ctx.ReEncryptAsync<Record, Guid>());
     }
 
     private sealed class Plain

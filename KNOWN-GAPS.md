@@ -57,7 +57,7 @@ production. None of these are secret; several are intentional design choices.
   interfaces.
 - **No automatic rotation or re-encryption job.** Rotation is *safe* (old values stay
   readable by key id) and *supported* — rotate the active key in place with the ring's
-  `AddKey`/`SetActiveKey`, and re-encrypt existing rows with `DbContext.ReEncryptAsync<T>()`
+  `AddKey`/`SetActiveKey`, and re-encrypt existing rows with `DbContext.ReEncryptAsync<TEntity, TKey>()`
   (or `MarkEncryptedPropertiesModified` for custom sweeps) — but the library does not
   *schedule* rotation. You decide when to rotate and when to run the sweep. Note that rebuilding
   a fresh protector/ring to rotate does **not** work: EF Core caches the model (and the

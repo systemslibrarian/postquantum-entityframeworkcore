@@ -223,16 +223,18 @@ on the ring the protector already holds:
 ```csharp
 dekRing.AddKey(DataEncryptionKey.Generate("dek-2026-07")); // add the new key
 dekRing.SetActiveKey("dek-2026-07");                        // new writes use it; old rows still decrypt
-int rewritten = await db.ReEncryptAsync<Customer>();       // re-encrypt existing rows under the new key
+int rewritten = await db.ReEncryptAsync<Customer, int>();  // re-encrypt existing rows under the new key
 dekRing.RemoveKey("dek-2026-01");                          // retire the old key once the sweep is done
 ```
 
 1. Add a new key and activate it. New writes use it automatically; existing rows still decrypt
    by their recorded key id.
-2. Re-encrypt old rows with `ReEncryptAsync<T>()` (or `MarkEncryptedPropertiesModified` for a
-   custom query) to retire a key. A plain load-and-`SaveChanges` will **not** rewrite an
-   unchanged value — change tracking compares the decrypted value — so the helper marks the
-   columns for you.
+2. Re-encrypt old rows with `ReEncryptAsync<TEntity, TKey>()` on a dedicated context (or
+   `MarkEncryptedPropertiesModified` for a custom query) to retire a key. A plain
+   load-and-`SaveChanges` will **not** rewrite an unchanged value — change tracking compares
+   the decrypted value — so the helper marks the columns for you. The sweep snapshots primary
+   keys up front and batches by key membership, so it is safe to run online (no row is skipped
+   under concurrent inserts or deletes).
 3. Remove the old key from the ring.
 
 > **Rotate in place, not by swapping the protector.** EF Core caches the model, and the value
@@ -283,7 +285,7 @@ itemized list of current limitations.
   on the protected value). This is intentional — encryption is non-deterministic.
 - **No automatic key rotation/scheduling.** The library makes rotation *safe* and provides
   helpers to perform it (`AddKey`/`SetActiveKey`/`RemoveKey` on the ring and
-  `ReEncryptAsync<T>()`), but it does not *schedule* it — you decide when. Scheduling belongs
+  `ReEncryptAsync<TEntity, TKey>()`), but it does not *schedule* it — you decide when. Scheduling belongs
   in PostQuantum.KeyManagement.
 - **ML-KEM availability is platform-dependent** (see below). Where unavailable, you get a
   clear `PlatformNotSupportedException` rather than a silent downgrade. AES-256-GCM always

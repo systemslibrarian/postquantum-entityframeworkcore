@@ -23,7 +23,12 @@ namespace PostQuantum.EntityFrameworkCore.Keys;
 public sealed class InMemoryKeyEncapsulationKeyRing : IKeyEncapsulationKeyRing, IDisposable
 {
     private readonly ConcurrentDictionary<string, KeyEncapsulationKeyPair> _keys;
-    private volatile string _activeKeyId;
+    private readonly object _rotationLock = new();
+
+    // Held as a direct reference (not an id looked up separately) so a lock-free read of
+    // ActiveKey cannot observe an id whose pair was concurrently removed. Mutations are
+    // serialized by _rotationLock so check-then-act is atomic.
+    private volatile KeyEncapsulationKeyPair _activeKey = null!;
     private bool _disposed;
 
     /// <summary>Creates a ring from a set of key pairs, designating one as active.</summary>
@@ -41,13 +46,13 @@ public sealed class InMemoryKeyEncapsulationKeyRing : IKeyEncapsulationKeyRing, 
             }
         }
 
-        if (!_keys.ContainsKey(activeKeyId))
+        if (!_keys.TryGetValue(activeKeyId, out KeyEncapsulationKeyPair? active))
         {
             throw new ArgumentException(
                 $"Active key id '{activeKeyId}' was not found among the supplied keys.", nameof(activeKeyId));
         }
 
-        _activeKeyId = activeKeyId;
+        _activeKey = active;
     }
 
     /// <summary>Creates a ring holding a single key pair, which is also active.</summary>
@@ -62,7 +67,7 @@ public sealed class InMemoryKeyEncapsulationKeyRing : IKeyEncapsulationKeyRing, 
         get
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            return _keys[_activeKeyId];
+            return _activeKey;
         }
     }
 
@@ -78,11 +83,14 @@ public sealed class InMemoryKeyEncapsulationKeyRing : IKeyEncapsulationKeyRing, 
     /// <exception cref="ArgumentException">A pair with the same id is already present.</exception>
     public void AddKey(KeyEncapsulationKeyPair key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(key);
-        if (!_keys.TryAdd(key.KeyId, key))
+        lock (_rotationLock)
         {
-            throw new ArgumentException($"A key with id '{key.KeyId}' is already in the ring.", nameof(key));
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_keys.TryAdd(key.KeyId, key))
+            {
+                throw new ArgumentException($"A key with id '{key.KeyId}' is already in the ring.", nameof(key));
+            }
         }
     }
 
@@ -90,14 +98,17 @@ public sealed class InMemoryKeyEncapsulationKeyRing : IKeyEncapsulationKeyRing, 
     /// <exception cref="ArgumentException">No pair with this id is in the ring.</exception>
     public void SetActiveKey(string keyId)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
-        if (!_keys.ContainsKey(keyId))
+        lock (_rotationLock)
         {
-            throw new ArgumentException($"No key with id '{keyId}' is in the ring; add it first.", nameof(keyId));
-        }
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_keys.TryGetValue(keyId, out KeyEncapsulationKeyPair? key))
+            {
+                throw new ArgumentException($"No key with id '{keyId}' is in the ring; add it first.", nameof(keyId));
+            }
 
-        _activeKeyId = keyId;
+            _activeKey = key;
+        }
     }
 
     /// <summary>
@@ -108,20 +119,23 @@ public sealed class InMemoryKeyEncapsulationKeyRing : IKeyEncapsulationKeyRing, 
     /// <exception cref="ArgumentException">An attempt was made to remove the active key.</exception>
     public bool RemoveKey(string keyId)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentException.ThrowIfNullOrWhiteSpace(keyId);
-        if (string.Equals(keyId, _activeKeyId, StringComparison.Ordinal))
+        lock (_rotationLock)
         {
-            throw new ArgumentException("Cannot remove the active key; activate another key first.", nameof(keyId));
-        }
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (string.Equals(keyId, _activeKey.KeyId, StringComparison.Ordinal))
+            {
+                throw new ArgumentException("Cannot remove the active key; activate another key first.", nameof(keyId));
+            }
 
-        if (_keys.TryRemove(keyId, out KeyEncapsulationKeyPair? removed))
-        {
-            removed.Dispose();
-            return true;
-        }
+            if (_keys.TryRemove(keyId, out KeyEncapsulationKeyPair? removed))
+            {
+                removed.Dispose();
+                return true;
+            }
 
-        return false;
+            return false;
+        }
     }
 
     /// <summary>Zeroes and disposes every key pair held by the ring.</summary>

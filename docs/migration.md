@@ -81,8 +81,11 @@ generated. Use the helpers, which mark the encrypted columns so EF re-runs the c
 
 ```csharp
 // Sweep every row of an entity in batches, rewriting each encrypted column under the
-// now-active key. Safe to run online.
-int rewritten = await db.ReEncryptAsync<Customer>(batchSize: 500);
+// now-active key. Run it on a DEDICATED context (no tracked entities): the sweep saves and
+// evicts as it goes. It snapshots primary keys up front and batches by key membership, so it
+// is safe to run online — concurrent inserts/deletes cannot cause a row to be skipped.
+// Pass the entity type and its primary-key type.
+int rewritten = await maintenanceDb.ReEncryptAsync<Customer, int>(batchSize: 500);
 
 // …or, for a custom query / composite keys, force re-encryption per entity:
 foreach (var c in db.Customers.Where(/* your filter */))

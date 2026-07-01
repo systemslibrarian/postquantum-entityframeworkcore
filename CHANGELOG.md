@@ -20,11 +20,14 @@ readable across 1.x.
   protector to rotate does not work — EF Core caches the model, including the captured
   protector — so this is the supported path; a KMS-backed ring reflects its active key
   dynamically.)
-- **Re-encryption helpers** (`EncryptedDataMaintenance`): `DbContext.ReEncryptAsync<T>()`
+- **Re-encryption helpers** (`EncryptedDataMaintenance`): `DbContext.ReEncryptAsync<TEntity, TKey>()`
   sweeps an entity's rows in batches and rewrites each encrypted column under the active
   key/scheme; `DbContext.MarkEncryptedPropertiesModified(entity)` does the same for a custom
   query. These force EF Core to re-run the value converter — a plain load-and-`SaveChanges`
-  does not, because change tracking compares the unchanged decrypted value.
+  does not, because change tracking compares the unchanged decrypted value. The sweep
+  snapshots primary keys up front and batches by key membership (not offset paging), so it is
+  safe to run online — concurrent inserts/deletes cannot skip a row — and it requires a
+  dedicated context (no tracked entities) so it never commits or evicts your application's graph.
 - **Fail-fast startup validation.** Constructing the protector now verifies that the default
   scheme is usable on this platform and has an active key, so a misconfiguration (for example
   ML-KEM as the default on a host without it) throws at construction/startup rather than on the

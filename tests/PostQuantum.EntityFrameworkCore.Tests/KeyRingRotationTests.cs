@@ -51,6 +51,38 @@ public class KeyRingRotationTests
     }
 
     [Fact]
+    public void Concurrent_rotation_and_reads_never_leave_the_active_key_dangling()
+    {
+        // Stresses the rotation lock: interleaving AddKey/SetActiveKey/RemoveKey with ActiveKey
+        // reads must never throw (e.g. remove the active key out from under a reader).
+        using var ring = new InMemoryDataProtectionKeyRing(DataEncryptionKey.Generate("dek-0"));
+        var failures = new System.Collections.Concurrent.ConcurrentBag<string>();
+
+        Parallel.For(1, 200, i =>
+        {
+            string id = $"dek-{i}";
+            try
+            {
+                ring.AddKey(DataEncryptionKey.Generate(id));
+                ring.SetActiveKey(id);
+                _ = ring.ActiveKey.KeyId; // must always resolve to a present key
+                ring.RemoveKey("dek-0");   // races with everyone; false or throws-if-active is fine
+            }
+            catch (ArgumentException)
+            {
+                // Expected, benign contention: e.g. dek-0 became active, or was already removed.
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{id}: {ex.GetType().Name}");
+            }
+        });
+
+        Assert.Empty(failures);
+        Assert.NotNull(ring.ActiveKey); // invariant holds after the storm
+    }
+
+    [Fact]
     public void Kek_ring_supports_the_same_rotation_surface()
     {
         var kem = new FakeKeyEncapsulationMechanism();

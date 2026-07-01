@@ -64,7 +64,7 @@ before relying on the library for anything that matters.
 
 - Keep keys in a managed store; rotate DEKs on a schedule. Rotate the active key in place on
   the ring the protector holds, then retire the old key once a re-encryption sweep completes
-  (see [migration.md](migration.md) and `DbContext.ReEncryptAsync<T>()`).
+  (see [migration.md](migration.md) and `DbContext.ReEncryptAsync<TEntity, TKey>()`).
 - Prefer the ML-KEM hybrid scheme for new data on supported platforms.
 - Treat decrypted values as toxic: minimize where they live and how long.
 - Pad values whose *length* is sensitive before storing them.
