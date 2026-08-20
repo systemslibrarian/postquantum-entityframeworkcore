@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-08-20
+
+Patch: dependency maintenance. No public API change and no behavioural change; a drop-in over 1.0.0.
+
+### Changed
+
+- Test and CI toolchain updated — `Microsoft.NET.Test.Sdk` 18.9.0, `xunit.runner.visualstudio`
+  4.0.0, `Microsoft.CodeAnalysis.PublicApiAnalyzers` 5.6.0, `Microsoft.SourceLink.GitHub` 10.0.400
+  and the GitHub Actions used by CI. `Microsoft.SourceLink.GitHub` is `PrivateAssets`, so none of
+  these reach the published package.
+
 ## [1.0.0] — 2026-06-30
 
 First stable release. Commits to Semantic Versioning for the 1.x line: the public API and the
