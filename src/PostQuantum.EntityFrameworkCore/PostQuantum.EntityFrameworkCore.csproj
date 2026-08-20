@@ -16,7 +16,7 @@
   <!-- ===== NuGet package metadata ===== -->
   <PropertyGroup>
     <PackageId>PostQuantum.EntityFrameworkCore</PackageId>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Title>PostQuantum.EntityFrameworkCore</Title>
     <Description>Secure-by-default, post-quantum encryption for sensitive data at rest in Entity Framework Core. Encrypt individual properties (emails, PII, financial and medical data) with authenticated AES-256-GCM, optionally wrapped in an ML-KEM-768 (FIPS 203) hybrid envelope for post-quantum key protection. Clean value-converter API, pluggable key rings for integration with PostQuantum.KeyManagement, honest threat model, and transparent supply chain.</Description>
     <PackageTags>post-quantum;postquantum;pqc;encryption;ml-kem;mlkem;kyber;fips203;entity-framework;entityframeworkcore;efcore;encryption-at-rest;column-encryption;field-encryption;pii;aes-gcm;security;cryptography</PackageTags>
